@@ -1,0 +1,7 @@
+Makefile
+.target/
+main
+*.o
+*.log
+*.tmp
+.clang-format
