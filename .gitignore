@@ -5,3 +5,5 @@ main
 *.log
 *.tmp
 .clang-format
+main.c
+tmp.py

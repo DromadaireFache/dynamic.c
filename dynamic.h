@@ -41,6 +41,54 @@ typedef struct _ListHeader {
     __auto_type var = list[0]; \
     for (int i = 0; i < len(list); var = list[++i])
 
+#define List_insert(list, idx, element)                                                   \
+    {                                                                                     \
+        _ListHeader* head = _List_get_header(list);                                       \
+        head->length++;                                                                   \
+        if (head->length >= head->capacity) list = List_resize(list, head->capacity * 2); \
+        size_t i = _List_convert_idx((list), (idx), __func__, __FILE_NAME__, __LINE__);   \
+        size_t tail = len(list) - i;                                                      \
+        if (tail) {                                                                       \
+            char* base = (char*)list;                                                     \
+            size_t esz = head->element_size;                                              \
+            memmove(base + (i + 1) * esz, base + i * esz, tail * esz);                    \
+        }                                                                                 \
+        (list)[i] = (element);                                                            \
+    }
+
+#define List_set(list, idx, element)                                                    \
+    {                                                                                   \
+        size_t i = _List_convert_idx((list), (idx), __func__, __FILE_NAME__, __LINE__); \
+        (list)[i] = (element);                                                          \
+    }
+
+typedef bool (*cmp_fn_t)(void*, void*);
+#define List_index(list, value) _List_index((list), &(__typeof__((list)[0])){(value)})
+#define List_contains(list, value) (_List_index((list), &(__typeof__((list)[0])){(value)}) != -1)
+#define List_index_fn(list, value, fn) _List_index_fn((list), (void*)(value), (cmp_fn_t)(fn))
+#define List_contains_fn(list, value, fn) \
+    (_List_index_fn((list), (void*)(value), (cmp_fn_t)(fn)) != -1)
+
+#define List_extend(list1, list2)                                                      \
+    {                                                                                  \
+        __auto_type _l2 = (list2);                                                     \
+        _ListHeader* head = _List_get_header(list1);                                   \
+        size_t cur_len = head->length;                                                 \
+        head->length += len(_l2);                                                      \
+        if (head->length >= head->capacity) {                                          \
+            size_t new_capacity =                                                      \
+                head->length > 2 * head->capacity ? head->length : 2 * head->capacity; \
+            list1 = List_resize(list1, new_capacity);                                  \
+        }                                                                              \
+        memcpy(list1 + cur_len, _l2, len(_l2) * head->element_size);                   \
+    }
+
+#define List_repeat(list, count) ((typeof(list))_List_repeat((list), (count)))
+
+#define List_copy(list) ((typeof(list))_List_copy((list)))
+
+#define List_sort(list, cmp_fn) _List_sort((list), (int (*)(const void*, const void*))(cmp_fn))
+
 void* _List_new(size_t element_size, size_t length);
 void* List_resize(void* list, size_t new_capacity);
 _ListHeader* _List_get_header(void* list);
@@ -50,8 +98,16 @@ void List_free(void* list);
 void List_remove(void* list, size_t i, void* output);
 void List_pop(void* list, void* output);
 size_t _List_convert_idx(void* list, int idx, const char* _fn, const char* _file, int _ln);
+void List_clear(void* list);
+int _List_index(void* list, const void* value);
+int _List_index_fn(void* list, void* value, bool (*cmp_fn)(void*, void*));
+void* _List_repeat(void* list, size_t count);
+void* _List_copy(void* list);
+void _List_sort(void* list, int (*cmp_fn)(const void*, const void*));
 
 // String stuff
+
+#define WHITESPACE " \n\t\r"
 
 typedef char* String;
 String String_new(const char* _Format, ...);
@@ -65,13 +121,14 @@ String String_upper(String s);
 String String_lower(String s);
 bool String_equals(String s1, String s2);
 String String_join(String sep, String* list);
-/*
 bool String_isalpha(String s);
 bool String_isdigit(String s);
 bool String_isalnum(String s);
 bool String_startswith(String s, String prefix);
 bool String_endswith(String s, String suffix);
-String String_strip(String s, const char *characters);
+bool String_contains(String s, char c);
+String String_strip(String s, char* characters);
+/*
 center()
 count()
 expandtabs()
@@ -112,7 +169,11 @@ title()
 
 // Garbage collector stuff
 
-void* gc_track(void* p);    // Start tracking object for collection
-void gc_frame(void);        // Create new garbage collection layer
-void* gc_keep(void* p);     // Stop tracking object
-void* gc_collect(void* p);  // Collect and move object to previous collection layer
+typedef void (*free_fn_t)(void*);
+void* gc_track(void* p, free_fn_t free_fn);  // Start tracking object for collection
+void gc_frame(void);                         // Create new garbage collection layer
+void* gc_keep(void* p);                      // Stop tracking object
+void* gc_collect(void* p);                   // Collect and move object to previous collection layer
+void* gc_calloc(size_t count, size_t size);  // Garbage collected calloc
+void* gc_malloc(size_t size);                // Garbage collected malloc
+void* gc_realloc(void* ptr, size_t size);    // Garbage collected realloc

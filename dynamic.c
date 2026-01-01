@@ -9,12 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void*** gc = NULL;
-size_t gc_tracked = 0, gc_freed = 0, gc_untracked = 0;
+#define DEBUG 1
 
-void** gc_pop_frame(void) { return len(gc) > 0 ? gc[len(gc) - 1] : NULL; }
+typedef struct GCItem {
+    void* ptr;
+    free_fn_t free_fn;
+} GCItem;
 
-#define DEBUG 0
+static GCItem** gc = NULL;
+static size_t gc_tracked = 0, gc_freed = 0, gc_untracked = 0;
+
+static GCItem* gc_pop_frame(void) { return len(gc) > 0 ? gc[len(gc) - 1] : NULL; }
 
 #if DEBUG == 1
 #define GC_INFO(...) printf("GC INFO *** " __VA_ARGS__)
@@ -26,7 +31,7 @@ _ListHeader* _List_get_header(void* list) { return (_ListHeader*)list - 1; }
 
 size_t len(void* list) { return _List_get_header(list)->length; }
 
-void* _List_new_untracked(size_t element_size, size_t capacity) {
+static void* _List_new_untracked(size_t element_size, size_t capacity) {
     _ListHeader* head = malloc(sizeof(_ListHeader) + element_size * capacity);
     if (head == NULL) return NULL;
     head->capacity = capacity;
@@ -37,7 +42,7 @@ void* _List_new_untracked(size_t element_size, size_t capacity) {
 
 void* _List_new(size_t element_size, size_t capacity) {
     void* list = _List_new_untracked(element_size, capacity);
-    gc_track(_List_get_header(list));
+    gc_track(list, List_free);
     return list;
 }
 
@@ -52,21 +57,22 @@ void* _List_from_array(size_t elem_size, const void* arr, size_t n) {
     return list;
 }
 
-void* _List_resize(void* list, size_t new_capacity, bool update_ptr) {
+static void* _List_resize(void* list, size_t new_capacity, bool update_ptr) {
     _ListHeader* head = _List_get_header(list);
     _ListHeader* new_head = realloc(head, sizeof(_ListHeader) + head->element_size * new_capacity);
     if (new_head == NULL) return list;  // Fail-safe
     new_head->capacity = new_capacity;
+    void* new_list = (void*)&new_head[1];
 
     // if List is being tracked, update the pointer
-    void** frame = gc_pop_frame();
+    GCItem* frame = gc_pop_frame();
     if (update_ptr && frame != NULL) {
         foreach (object, frame) {
-            if (object == head) frame[i] = new_head;
+            if (object.ptr == list) frame[i].ptr = new_list;
         }
     }
 
-    return (void*)&new_head[1];
+    return new_list;
 }
 
 void* __attribute__((warn_unused_result)) List_resize(void* list, size_t new_capacity) {
@@ -101,7 +107,51 @@ size_t _List_convert_idx(void* list, int idx, const char* _fn, const char* _file
     return (size_t)_idx;
 }
 
-char* _get_format_type(const char* _Format) {
+void List_clear(void* list) { _List_get_header(list)->length = 0; }
+
+int _List_index(void* list, const void* value) {
+    const size_t element_size = _List_get_header(list)->element_size;
+    for (int i = 0; i < len(list); i++) {
+        if (memcmp(list + i * element_size, value, element_size) == 0) return i;
+    }
+    return -1;
+}
+
+int _List_index_fn(void* list, void* value, cmp_fn_t cmp_fn) {
+    const size_t element_size = _List_get_header(list)->element_size;
+    for (int i = 0; i < len(list); i++) {
+        if (cmp_fn(*(void**)(list + i * element_size), value)) return i;
+    }
+    return -1;
+}
+
+void* _List_repeat(void* list, size_t count) {
+    _ListHeader* head = _List_get_header(list);
+    size_t new_length = head->length * count;
+    size_t old_size = head->length * head->element_size;
+    void* new_list = _List_new(head->element_size, new_length > 10 ? new_length : 10);
+
+    for (int i = 0; i < count; i++) {
+        memcpy(new_list + i * old_size, list, old_size);
+    }
+
+    _List_get_header(new_list)->length = new_length;
+    return new_list;
+}
+
+void* _List_copy(void* list) {
+    _ListHeader* head = _List_get_header(list);
+    void* new_list = _List_new(head->element_size, head->capacity);
+    memcpy(new_list, list, head->length * head->element_size);
+    _List_get_header(new_list)->length = head->length;
+    return new_list;
+}
+
+void _List_sort(void* list, int (*cmp_fn)(const void*, const void*)) {
+    qsort(list, len(list), _List_get_header(list)->element_size, cmp_fn);
+}
+
+static char* _get_format_type(const char* _Format) {
     char* format_type = (char*)_Format;
     char* ignore_chars = "%.-1234567890";
     while (*format_type) {
@@ -120,7 +170,7 @@ char* _get_format_type(const char* _Format) {
     return format_type;
 }
 
-String _String_from_format(const char* _Format, const char* _Format_type, void* item) {
+static String _String_from_format(const char* _Format, const char* _Format_type, void* item) {
     if (_Format_type == NULL) _Format_type = _get_format_type(_Format);
 
 #define _FMT_CHECK(fmt, type) \
@@ -211,16 +261,16 @@ String List_string(void* list, const char* _Format) {
 }
 
 __attribute__((constructor)) static void gc_init(void) {
-    gc = _List_new_untracked(sizeof(void**), 10);
-    void** frame = _List_new_untracked(sizeof(void*), 10);
+    gc = _List_new_untracked(sizeof(GCItem*), 10);
+    GCItem* frame = _List_new_untracked(sizeof(GCItem), 10);
     List_append(gc, frame);
 }
 
 __attribute__((destructor)) static void gc_cleanup(void) {
     foreach (frame, gc) {
         foreach (object, frame) {
-            GC_INFO("free(object=%p);\n", object);
-            free(object);
+            GC_INFO("free(object=%p);\n", object.ptr);
+            object.free_fn(object.ptr);
             gc_freed++;
         }
         GC_INFO("free(frame=%p);\n", _List_get_header(frame));
@@ -239,10 +289,11 @@ __attribute__((destructor)) static void gc_cleanup(void) {
         if (head->length >= head->capacity) list = _List_resize(list, head->capacity * 2, false); \
     }
 
-void* gc_track(void* p) {
-    void** frame = gc_pop_frame();
+void* gc_track(void* p, free_fn_t free_fn) {
+    GCItem* frame = gc_pop_frame();
     if (frame == NULL) return p;
-    _List_append_noupdate(frame, p);
+    if (free_fn == NULL) free_fn = free;
+    _List_append_noupdate(frame, ((GCItem){.ptr = p, .free_fn = free_fn}));
     gc[len(gc) - 1] = frame;  // In case frame gets resized
     GC_INFO("Frame #%zu: tracking %p\n", len(gc), p);
     gc_tracked++;
@@ -250,17 +301,16 @@ void* gc_track(void* p) {
 }
 
 void gc_frame(void) {
-    void** frame = _List_new_untracked(sizeof(void*), 10);
+    GCItem* frame = _List_new_untracked(sizeof(GCItem), 10);
     List_append(gc, frame);
 }
 
 void* gc_keep(void* p) {
-    _ListHeader* ph = _List_get_header(p);
-    void** frame = gc_pop_frame();
+    GCItem* frame = gc_pop_frame();
     if (frame == NULL) return p;
 
     foreach (object, frame) {
-        if (object != ph) continue;
+        if (object.ptr != p) continue;
         List_remove(frame, i, NULL);
         gc_untracked++;
         break;
@@ -272,17 +322,20 @@ void* gc_keep(void* p) {
 }
 
 void* gc_collect(void* p) {
-    bool found = false;
-    void** frame = gc_pop_frame();
+    GCItem* frame = gc_pop_frame();
     if (frame == NULL) return p;
 
+    bool found = false;
+    GCItem object_found;
+
     foreach (object, frame) {
-        if (p != NULL && object == _List_get_header(p)) {
+        if (p != NULL && object.ptr == p) {
             found = true;
+            object_found = object;
             continue;
         }
-        GC_INFO("collected: free(object=%p);\n", object);
-        free(object);
+        GC_INFO("collected: free(object=%p);\n", object.ptr);
+        object.free_fn(object.ptr);
         gc_freed++;
     }
     GC_INFO("free(frame=%p);\n", _List_get_header(frame));
@@ -290,11 +343,27 @@ void* gc_collect(void* p) {
     List_pop(gc, NULL);
 
     if (found) {
-        void** frame = gc_pop_frame();
-        if (frame != NULL) List_append(frame, (void*)_List_get_header(p));
+        GCItem* frame = gc_pop_frame();
+        if (frame != NULL) {
+            _List_append_noupdate(frame, object_found);
+            gc[len(gc) - 1] = frame;  // In case frame gets resized
+        }
     }
 
     return p;
+}
+
+void* gc_calloc(size_t count, size_t size) { return gc_track(calloc(count, size), free); }
+
+void* gc_malloc(size_t size) { return gc_track(malloc(size), free); }
+
+void* gc_realloc(void* ptr, size_t size) {
+    void* new_ptr = realloc(ptr, size);
+    GCItem* frame = gc_pop_frame();
+    foreach (object, frame) {
+        if (object.ptr == ptr) frame[i].ptr = new_ptr;
+    }
+    return new_ptr;
 }
 
 String String_new(const char* _Format, ...) {
@@ -327,6 +396,7 @@ String String_slice(String s, int start, int last, int step) {
     if (start < 0) start += len_s;
     if (last < 0) last += len_s + 1;
 
+    if (start == last) return String_new("");
     assert(start >= 0 && start < len_s);
     assert(last > 0 && last <= len_s);
     assert(last > start);
@@ -396,4 +466,56 @@ String String_join(String sep, String* list) {
 
     *p = 0;
     return result;
+}
+
+bool String_isalpha(String s) {
+    char* c = s;
+    while (*c) {
+        if (!isalpha(*c)) return false;
+        c++;
+    }
+    return true;
+}
+
+bool String_isdigit(String s) {
+    char* c = s;
+    while (*c) {
+        if (!isdigit(*c)) return false;
+        c++;
+    }
+    return true;
+}
+
+bool String_isalnum(String s) {
+    char* c = s;
+    while (*c) {
+        if (!isalnum(*c)) return false;
+        c++;
+    }
+    return true;
+}
+
+bool String_startswith(String s, String prefix) {
+    if (strlen(prefix) > strlen(s)) return false;
+    return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+bool String_endswith(String s, String suffix) {
+    if (strlen(suffix) > strlen(s)) return false;
+    return strncmp(s + strlen(s) - strlen(suffix), suffix, strlen(suffix)) == 0;
+}
+
+bool String_contains(String s, char c) {
+    while (*s)
+        if (*s++ == c) return true;
+    return false;
+}
+
+String String_strip(String s, char* characters) {
+    int start = 0, end = strlen(s);
+
+    while (start < end && String_contains(characters, s[start])) start++;
+    while (end - 1 >= start && String_contains(characters, s[end - 1])) end--;
+
+    return String_slice(s, start, end, 1);
 }

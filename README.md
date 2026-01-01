@@ -34,6 +34,15 @@ int main() {
 - `List_resize(list, new_size)`: Resize the list to the new size.
 - `List_pop(list)`: Remove and return the last element of the list.
 - `List_remove(list, index)`: Remove the element at the specified index.
+- `List_set(list, index, element)`: Set the element at the specified index.
+- `List_insert(list, index, element)`: Insert an element at the specified index.
+- `List_clear(list)`: Clear all elements from the list.
+- `List_index(list, element)`: Get the index of the specified element in the list.
+- `List_contains(list, element)`: Check if the list contains the specified element.
+- `List_extend(list1, list2)`: Extend list1 by appending elements from list2.
+- `List_repeat(list, count)`: Create a new list by repeating the specified list a given number of times.
+- `List_copy(list)`: Create a shallow copy of the list.
+- `List_sort(list, compare_func)`: Sort the list using the specified comparison function.
 
 ### `foreach` Macro
 
@@ -97,6 +106,13 @@ int main() {
 - `String_lower(str)`: Convert the string to lowercase.
 - `String_equals(str1, str2)`: Check if two strings are equal.
 - `String_join(separator, list)`: Join a list of strings using the specified separator.
+- `String_isalpha(str)`: Check if the string contains only alphabetic characters.
+- `String_isdigit(str)`: Check if the string contains only digit characters.
+- `String_isalnum(str)`: Check if the string contains only alphanumeric characters.
+- `String_startswith(str, prefix)`: Check if the string starts with the specified prefix.
+- `String_endswith(str, suffix)`: Check if the string ends with the specified suffix.
+- `String_contains(str, character)`: Check if the string contains the specified character.
+- `String_strip(str)`: Remove leading and trailing whitespace from the string.
 
 ## Garbage Collection
 
@@ -156,8 +172,6 @@ List_free(mylist); // Manually free mylist when done
 
 The `gc_track(obj)` function adds a non-dynamic object `obj` to garbage collection tracking, meaning it will be freed during garbage collection.
 
-_Note: `obj` cannot be untracked or sent to another frame._
-
 ```c
 int* myarray = malloc(10 * sizeof(int));
 gc_track(myarray); // myarray will be freed during gc_collect
@@ -166,9 +180,8 @@ gc_collect(NULL); // myarray is freed
 ```
 
 ```c
-int* myarray = malloc(10 * sizeof(int));
-gc_track(myarray); // myarray will be freed during gc_collect
+int* myarray = gc_malloc(10 * sizeof(int)); // myarray will be freed during gc_collect
 // ...
-gc_keep(myarray); // Error: myarray cannot be untracked
-gc_collect(myarray); // Error: myarray cannot be sent to another frame
+gc_collect(NULL); // myarray is freed
+// There is also gc_calloc and gc_realloc functions available.
 ```
