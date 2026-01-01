@@ -123,9 +123,8 @@ The library includes basic garbage collection functionalities to manage memory o
 #include <stdio.h>
 
 int main() {
-    gc_frame();
-    int* mylist = List_new(int, 1, 2, 3);
-    gc_collect(NULL); // List is freed automatically
+    collected; // Enable garbage collection for this scope
+    int* mylist = List_new(int, 1, 2, 3); // List is freed automatically
     return 0;
 }
 ```
@@ -136,10 +135,21 @@ The garbage collector stores a stack of frames. Each call to `gc_frame()` pushes
 
 A frame is created by default at the start of the program, so you don't need to call `gc_frame()` unless you want to create nested frames.
 
+You can also use the `collected;` keyword at the start of a function to automatically create a garbage collection frame for that function's scope.
+
 ```c
 gc_frame(); // Push a new frame
 // Dynamic objects created here ...
 gc_collect(NULL); // Free all objects in the current frame and pop the frame
+```
+
+```c
+// Or use collected keyword
+void my_function() {
+    collected; // Automatically creates a gc frame
+    int* mylist = List_new(int, 1, 2, 3);
+    // mylist is automatically freed when the function returns
+}
 ```
 
 ### Object Collection
@@ -148,7 +158,7 @@ The `gc_collect(obj)` function frees all objects in the current frame except for
 
 ```c
 int* foo() {
-    gc_frame(); // Push a new frame
+    collected; // Push a new frame
     int* mylist = List_new(int, 1, 2, 3);
     int* anotherlist = List_new(int, 4, 5, 6);
     return gc_collect(mylist); // Free anotherlist, send mylist to next frame
@@ -184,4 +194,12 @@ int* myarray = gc_malloc(10 * sizeof(int)); // myarray will be freed during gc_c
 // ...
 gc_collect(NULL); // myarray is freed
 // There is also gc_calloc and gc_realloc functions available.
+```
+
+```c
+void my_function() {
+    defer int* myarray = gc_malloc(10 * sizeof(int)); // myarray will be freed at the end of the scope
+    // ...
+    // myarray is freed automatically at the end of the scope
+}
 ```

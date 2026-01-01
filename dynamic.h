@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -177,3 +178,116 @@ void* gc_collect(void* p);                   // Collect and move object to previ
 void* gc_calloc(size_t count, size_t size);  // Garbage collected calloc
 void* gc_malloc(size_t size);                // Garbage collected malloc
 void* gc_realloc(void* ptr, size_t size);    // Garbage collected realloc
+size_t _gc_frame_nbr(void);
+
+static inline void _gc_cleanup(void* frame_nbr_p) {
+    size_t frame_nbr = *(size_t*)frame_nbr_p;
+    while (frame_nbr <= _gc_frame_nbr()) gc_collect(NULL);
+}
+
+static inline void _auto_free(const void* p) { free(*(void**)p); }
+
+#define $(function_body) \
+    {                    \
+        collected;       \
+        function_body    \
+    }
+
+#define var __auto_type
+#define let const __auto_type
+#define collected \
+    gc_frame();   \
+    __attribute__((cleanup(_gc_cleanup))) size_t __$__ = _gc_frame_nbr()
+#define defer __attribute__((cleanup(_auto_free)))
+
+#define new(dynamic) dynamic##_new
+typedef void* List;
+
+// Print function
+
+static inline void _print_cstr(const char* s) { printf("%s", s); }
+static inline void _print_int(int v) { printf("%d", v); }
+static inline void _print_uint(unsigned v) { printf("%u", v); }
+static inline void _print_long(long v) { printf("%ld", v); }
+static inline void _print_ulong(unsigned long v) { printf("%lu", v); }
+static inline void _print_llong(long long v) { printf("%lld", v); }
+static inline void _print_ullong(unsigned long long v) { printf("%llu", v); }
+static inline void _print_float(double v) { printf("%f", v); }
+static inline void _print_double(double v) { printf("%lf", v); }
+static inline void _print_ptr(const void* p) { printf("%p", p); }
+
+#define _p(arg)                            \
+    _Generic((arg),                        \
+        char*: _print_cstr,                \
+        signed char: _print_int,           \
+        unsigned char: _print_uint,        \
+        short: _print_int,                 \
+        unsigned short: _print_uint,       \
+        int: _print_int,                   \
+        unsigned int: _print_uint,         \
+        long: _print_long,                 \
+        unsigned long: _print_ulong,       \
+        long long: _print_llong,           \
+        unsigned long long: _print_ullong, \
+        float: _print_float,               \
+        double: _print_double,             \
+        void*: _print_ptr,                 \
+        default: _print_ptr)((arg))
+
+#define print(...)                                                                             \
+    _print_impl(__VA_ARGS__, _print_20, _print_19, _print_18, _print_17, _print_16, _print_15, \
+                _print_14, _print_13, _print_12, _print_11, _print_10, _print_9, _print_8,     \
+                _print_7, _print_6, _print_5, _print_4, _print_3, _print_2, _print_1)
+
+#define _print_impl(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, \
+                    _18, _19, _20, N, ...)                                                      \
+    N(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20)
+
+#define _print_1(_1, ...) (_p(_1))
+#define _print_2(_1, _2, ...) (_p(_1), _p(_2))
+#define _print_3(_1, _2, _3, ...) (_p(_1), _p(_2), _p(_3))
+#define _print_4(_1, _2, _3, _4, ...) (_p(_1), _p(_2), _p(_3), _p(_4))
+#define _print_5(_1, _2, _3, _4, _5, ...) (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5))
+#define _print_6(_1, _2, _3, _4, _5, _6, ...) (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6))
+#define _print_7(_1, _2, _3, _4, _5, _6, _7, ...) \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7))
+#define _print_8(_1, _2, _3, _4, _5, _6, _7, _8, ...) \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8))
+#define _print_9(_1, _2, _3, _4, _5, _6, _7, _8, _9, ...) \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9))
+#define _print_10(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, ...) \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10))
+#define _print_11(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, ...) \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11))
+#define _print_12(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, ...)                      \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11), \
+     _p(_12))
+#define _print_13(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, ...)                 \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11), \
+     _p(_12), _p(_13))
+#define _print_14(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, ...)            \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11), \
+     _p(_12), _p(_13), _p(_14))
+#define _print_15(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, ...)       \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11), \
+     _p(_12), _p(_13), _p(_14), _p(_15))
+#define _print_16(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, ...)  \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11), \
+     _p(_12), _p(_13), _p(_14), _p(_15), _p(_16))
+#define _print_17(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, ...) \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11),     \
+     _p(_12), _p(_13), _p(_14), _p(_15), _p(_16), _p(_17))
+#define _print_18(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, \
+                  ...)                                                                             \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11),     \
+     _p(_12), _p(_13), _p(_14), _p(_15), _p(_16), _p(_17), _p(_18))
+#define _print_19(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, \
+                  _19, ...)                                                                        \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11),     \
+     _p(_12), _p(_13), _p(_14), _p(_15), _p(_16), _p(_17), _p(_18), _p(_19))
+#define _print_20(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, \
+                  _19, _20, ...)                                                                   \
+    (_p(_1), _p(_2), _p(_3), _p(_4), _p(_5), _p(_6), _p(_7), _p(_8), _p(_9), _p(_10), _p(_11),     \
+     _p(_12), _p(_13), _p(_14), _p(_15), _p(_16), _p(_17), _p(_18), _p(_19), _p(_20))
+
+#define println(...) (print(__VA_ARGS__), putchar('\n'))

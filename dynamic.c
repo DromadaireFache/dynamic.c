@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct GCItem {
     void* ptr;
@@ -238,7 +238,7 @@ String String_from_format(const char* _Format, void* item) {
 
 String List_string(void* list, const char* _Format) {
     assert(_Format != NULL && _Format[0] != 0);
-    gc_frame();
+    collected;
     String* sb = List_new(String);
     _ListHeader* head = _List_get_header(list);
     size_t list_size = head->length * head->element_size;
@@ -365,6 +365,8 @@ void* gc_realloc(void* ptr, size_t size) {
     }
     return new_ptr;
 }
+
+size_t _gc_frame_nbr(void) { return len(gc); }
 
 String String_new(const char* _Format, ...) {
     String s = List_new(char);
