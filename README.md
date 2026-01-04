@@ -203,3 +203,45 @@ void my_function() {
     // myarray is freed automatically at the end of the scope
 }
 ```
+
+## `let` and `var` Keywords
+
+The `let` keyword is used to declare immutable variables, while the `var` keyword is used to declare mutable variables. Both keywords help improve code readability and maintainability.
+
+```c
+let x = 10; // Immutable variable
+var y = 20; // Mutable variable
+y = 30; // Valid
+x = 15; // Error: cannot modify immutable variable
+```
+
+## `print` Function
+
+The `print` and `println` functions are used to output formatted text to the console. They support various data types and format specifiers similar to `printf`. You do not need to use format specifiers for basic types; the functions will handle them automatically.
+
+```c
+print("Hello, world!\n");
+int x = 42;
+println("The answer is ", x);
+print("Pi is approximately ", 3.14159, "\n");
+```
+
+### `$f` Format Macro
+
+The `$f` macro is used to create format specifiers for the `print` and `println` functions. It allows you to specify how different data types should be formatted when printed.
+
+```c
+double pi = 3.14159;
+print("Pi to 2 decimal places: ", $f(pi, "%.2lf"), "\n");
+int number = 42;
+print("Number in hexadecimal: ", $f(number, "%x"), "\n");
+```
+
+### Printing lists
+
+Use the `List_string` function to convert lists to strings for printing.
+
+```c
+let list = List_new(double, 1, 3, 5, 7, 9);
+println(List_string(list, "%.2lf"));
+```

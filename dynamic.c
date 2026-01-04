@@ -170,7 +170,7 @@ static char* _get_format_type(const char* _Format) {
     return format_type;
 }
 
-static String _String_from_format(const char* _Format, const char* _Format_type, void* item) {
+String _String_from_format(const char* _Format, const char* _Format_type, const void* item) {
     if (_Format_type == NULL) _Format_type = _get_format_type(_Format);
 
 #define _FMT_CHECK(fmt, type) \

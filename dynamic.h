@@ -129,6 +129,7 @@ bool String_startswith(String s, String prefix);
 bool String_endswith(String s, String suffix);
 bool String_contains(String s, char c);
 String String_strip(String s, char* characters);
+String _String_from_format(const char* _Format, const char* _Format_type, const void* item);
 /*
 center()
 count()
@@ -187,12 +188,6 @@ static inline void _gc_cleanup(void* frame_nbr_p) {
 
 static inline void _auto_free(const void* p) { free(*(void**)p); }
 
-#define $(function_body) \
-    {                    \
-        collected;       \
-        function_body    \
-    }
-
 #define var __auto_type
 #define let const __auto_type
 #define collected \
@@ -200,13 +195,11 @@ static inline void _auto_free(const void* p) { free(*(void**)p); }
     __attribute__((cleanup(_gc_cleanup))) size_t __$__ = _gc_frame_nbr()
 #define defer __attribute__((cleanup(_auto_free)))
 
-#define new(dynamic) dynamic##_new
-typedef void* List;
-
 // Print function
 
 static inline void _print_cstr(const char* s) { printf("%s", s); }
 static inline void _print_int(int v) { printf("%d", v); }
+static inline void _print_char(char v) { printf("%c", v); }
 static inline void _print_uint(unsigned v) { printf("%u", v); }
 static inline void _print_long(long v) { printf("%ld", v); }
 static inline void _print_ulong(unsigned long v) { printf("%lu", v); }
@@ -226,6 +219,7 @@ static inline void _print_ptr(const void* p) { printf("%p", p); }
         int: _print_int,                   \
         unsigned int: _print_uint,         \
         long: _print_long,                 \
+        char: _print_char,                 \
         unsigned long: _print_ulong,       \
         long long: _print_llong,           \
         unsigned long long: _print_ullong, \
@@ -291,3 +285,5 @@ static inline void _print_ptr(const void* p) { printf("%p", p); }
      _p(_12), _p(_13), _p(_14), _p(_15), _p(_16), _p(_17), _p(_18), _p(_19), _p(_20))
 
 #define println(...) (print(__VA_ARGS__), putchar('\n'))
+
+#define $f(value, fmt) _String_from_format((fmt), NULL, &((__typeof__(value)){(value)}))
