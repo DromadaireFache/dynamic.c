@@ -396,7 +396,7 @@ String String_concat(String s1, String s2) { return String_new("%s%s", s1, s2); 
 String String_slice(String s, int start, int last, int step) {
     size_t len_s = strlen(s);
     if (start < 0) start += len_s;
-    if (last < 0) last += len_s + 1;
+    if (last <= 0) last += len_s;
 
     if (start == last) return String_new("");
     assert(start >= 0 && start < len_s);
