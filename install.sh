@@ -20,8 +20,8 @@ mkdir -p lib
 
 
 # 3. Compile source file
-echo $COMPILER $CFLAGS -c src/dynamic.c -o lib/dynamic.o
-$COMPILER $CFLAGS -c src/dynamic.c -o lib/dynamic.o
+echo $COMPILER $CFLAGS -c dynamic.c/src/dynamic.c -o lib/dynamic.o
+$COMPILER $CFLAGS -c dynamic.c/src/dynamic.c -o lib/dynamic.o
 if [ $? -ne 0 ]; then
     echo "Error: Compilation failed."
     exit 1
