@@ -101,9 +101,10 @@ void List_pop(void* list, void* output) {
 
 size_t _List_convert_idx(void* list, int idx, const char* _fn, const char* _file, int _ln) {
     int _idx = (idx < 0) ? idx + len(list) : idx;
-    (__builtin_expect(!(_idx >= 0 && _idx < len(list)), 0)
-         ? __assert_rtn(_fn, _file, _ln, String_new("index %d out of bounds", idx))
-         : (void)0);
+    if (__builtin_expect(!(_idx >= 0 && _idx < len(list)), 0)) {
+        fprintf(stderr, "Index %d out of bounds: function %s, file %s, line %d\n", idx, _fn, _file, _ln);
+        exit(1);
+    }
     return (size_t)_idx;
 }
 
@@ -251,7 +252,7 @@ String List_string(void* list, const char* _Format) {
             void** plist = (void**)list;
             element_string = List_string(plist[i / head->element_size], _Format + 1);
         } else {
-            element_string = _String_from_format(_Format, format_type, &list[i]);
+            element_string = _String_from_format(_Format, format_type, list + i);
         }
         List_append(sb, element_string);
     }
@@ -520,4 +521,34 @@ String String_strip(String s, char* characters) {
     while (end - 1 >= start && String_contains(characters, s[end - 1])) end--;
 
     return String_slice(s, start, end, 1);
+}
+
+Dict _Dict_new(size_t key_size, size_t val_size, int (*hash_fn)(void*), size_t capacity) {
+    let d = (Dict)malloc(sizeof(struct _Dict));
+    d->key_size = key_size;
+    d->val_size = val_size;
+    d->hash_fn = hash_fn;
+    d->capacity = capacity;
+    d->keys = malloc(capacity * key_size);
+    d->vals = malloc(capacity * val_size);
+    d->hashes = malloc(capacity * sizeof(int));
+    return gc_track(d, Dict_free);
+}
+
+void Dict_free(void* vd) {
+    let d = (Dict)vd;
+    free(d->keys);
+    free(d->vals);
+    free(d->hashes);
+    free(d);
+}
+
+void _Dict_add(Dict d, void* key, void* value) {
+    // let hash = d->hash_fn(key);
+    // let index = hash % d->capacity;
+
+    assert(0);
+    // while (1) {
+    //     if (hash == d->hashes[index]);
+    // }
 }

@@ -7,6 +7,12 @@ Files included:
 - dynamic.c
 - dynamic.h
 
+Install
+---
+```bash
+git clone https://github.com/DromadaireFache/dynamic.c.git && ./dynamic.c/install.sh
+```
+
 ## Dynamic List
 
 The dynamic list implementation allows you to create and manage generic lists that can grow and shrink in size as needed.

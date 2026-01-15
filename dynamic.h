@@ -181,7 +181,7 @@ void* gc_malloc(size_t size);                // Garbage collected malloc
 void* gc_realloc(void* ptr, size_t size);    // Garbage collected realloc
 size_t _gc_frame_nbr(void);
 
-static inline void _gc_cleanup(void* frame_nbr_p) {
+static inline void _gc_cleanup(const void* frame_nbr_p) {
     size_t frame_nbr = *(size_t*)frame_nbr_p;
     while (frame_nbr <= _gc_frame_nbr()) gc_collect(NULL);
 }
@@ -192,7 +192,7 @@ static inline void _auto_free(const void* p) { free(*(void**)p); }
 #define let const __auto_type
 #define collected \
     gc_frame();   \
-    __attribute__((cleanup(_gc_cleanup))) size_t __$__ = _gc_frame_nbr()
+    __attribute__((cleanup(_gc_cleanup))) const size_t __$__ = _gc_frame_nbr()
 #define defer __attribute__((cleanup(_auto_free)))
 
 // Print function
@@ -287,3 +287,26 @@ static inline void _print_ptr(const void* p) { printf("%p", p); }
 #define println(...) (print(__VA_ARGS__), putchar('\n'))
 
 #define $f(value, fmt) _String_from_format((fmt), NULL, &((__typeof__(value)){(value)}))
+
+// Dict stuff (hashmap)
+
+struct _Dict {
+    size_t capacity;
+    size_t key_size;
+    size_t val_size;
+    int (*hash_fn)(void*);
+    void *keys, *vals;
+    int *hashes;
+    bool *occupied;
+};
+
+typedef struct _Dict* Dict;
+
+#define Dict_new(key_type, val_type) \
+    _Dict_new(sizeof(key_type), sizeof(val_type), key_type##_hash, 10)
+
+#define Dict_add(dict, key, value) _Dict_add((dict), (void*){(key)}, (void*){(value)})
+
+Dict _Dict_new(size_t key_size, size_t val_size, int (*hash_fn)(void*), size_t capacity);
+void Dict_free(void* d);
+void _Dict_add(Dict d, void* key, void* value);
